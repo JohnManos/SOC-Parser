@@ -55,6 +55,7 @@ import javafx.scene.layout.StackPane;
 public class Main extends Application {
 	private Desktop desktop = Desktop.getDesktop();
 	private String fileName = null;
+	private final String dbUrl = "jdbc:mysql://localhost:3306/";
 	@Override
 	public void start(Stage primaryStage) {
 		try {
@@ -78,14 +79,7 @@ public class Main extends Application {
                 }
 				//fileName = fileInput.getText();
 				//System.out.println(fileName);
-				ExcelParser parser = new ExcelParser();
-				DBRenderer renderer = new DBRenderer();
-				renderer.createDatabase();
-				renderer.createTable();
-				if (!renderer.tableExists("sample")) {
-					parser.parseFile(fileName, renderer);
-				} else System.out.println("File already in database.");
-				//parser.parseFile("..\\..\\resources\\sample_sheet.xlsx", renderer);
+				parseAndRender();
 			}
 		};
 		openButton.setOnAction(event);
@@ -108,6 +102,41 @@ public class Main extends Application {
                 );
         }
     }
+	
+	private void parseAndRender() {
+		ExcelParser parser = new ExcelParser();
+		DBRenderer renderer = new DBRenderer();
+		renderer.connectToServer(dbUrl);
+		renderer.createDatabase("Courses");
+		renderer.connectToServer(dbUrl + "Courses");
+		if (!renderer.beenParsed("Sample")) {
+			String[][] dataArray = parser.parseFile(fileName, renderer);
+			String[] labels = new String[dataArray[0].length];
+			int rowIndex = 0;
+			for (String[] row : dataArray) {
+				Class rowObject = new Class();
+				// First data row is labels, so retrieve them to use as keys
+				if (rowIndex == 0) {
+					for (int i = 0; i < row.length; i++) {
+						labels[i] = row[i];
+					}
+					// This is called here because it needs an instance of the row's object to determine column names, but need only be called once
+					renderer.createTable("Sample", labels);
+				}
+				else {
+					// create key/vale pair for each cell
+					for (int i = 0; i < row.length; i++) {
+						rowObject.add(labels[i], row[i]);;
+					}
+					// Only add row into database if it is not the label row
+					renderer.insertRowInDB("Sample", rowObject);
+				}
+				++rowIndex;
+				
+			}
+			renderer.registerParsed("Sample");
+		} else System.out.println("File already in database.");
+	}
 	
 	public static void main(String[] args) {
 		launch(args);

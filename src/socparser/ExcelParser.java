@@ -14,27 +14,38 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class ExcelParser {
-	public void parseFile(String fileName, DBRenderer dbRenderer) {
+	public String[][] parseFile(String fileName, DBRenderer dbRenderer) {
 		System.out.println("Parsing file...");
+		String[][] data = null;
+		int numEmptyRows = 0;
 		try {		
 		    FileInputStream file = new FileInputStream(new File(fileName));
 		    XSSFWorkbook workbook = new XSSFWorkbook(file);
 		    XSSFSheet sheet = workbook.getSheetAt(0);
 		    //Iterator<Row> rowIterator = sheet.iterator();
 		    //rowIterator.next();
+		    // Scan for empty rows to size array appropriately
 		    for (Row row : sheet) {
-		    	if (!isRowEmpty(row)) {
+		    	if (isRowEmpty(row)) { 
+		    		++numEmptyRows;
+		    	}
+		    }
+		    data = new String[sheet.getLastRowNum() - numEmptyRows + 1][sheet.getRow(0).getLastCellNum()];
+		    System.out.println(sheet.getLastRowNum());
+		    int rowIndex = 0;
+		    for (Row row : sheet) {
+		    	if (!isRowEmpty(row)) { // Skip empty rows
 		    		Class rowObject = new Class();
 			    	String[] rowItem = new String[row.getLastCellNum()];
 			    	int cellIndex = 0;
 			        for (Cell cell : row) {
-			        	cell.setCellType(CellType.STRING);
+			        	cell.setCellType(CellType.STRING); // Change all cell types to String for simplicity's sake
 			        	rowItem[cellIndex++] = cell.getStringCellValue();	
 			        }
 			        for (String s : rowItem) {
 			        	System.out.println(s);
 			        }
-			        rowObject.course = rowItem[0];
+			        /*rowObject.course = rowItem[0];
 			        rowObject.gordonRule = rowItem[1];
 			        rowObject.genEd = rowItem[2];
 			        rowObject.section = rowItem[3];
@@ -65,8 +76,8 @@ public class ExcelParser {
 			        rowItem.enrCap = row.getCell(13).getStringCellValue();
 			        rowItem.schedCodes = row.getCell(14).getStringCellValue();
 			        */
-			        System.out.println();
-			        dbRenderer.insertRowInDB(rowObject);
+			        data[rowIndex++] = rowItem;
+			        //dbRenderer.insertRowInDB(rowObject);
 		    	}
 		        System.out.println("");	
 		    }
@@ -77,6 +88,7 @@ public class ExcelParser {
 		} catch (IOException e) {
 		    e.printStackTrace();
 		}
+		return data;
 	}
 	public static boolean isRowEmpty(Row row) {
 	    for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {

@@ -6,22 +6,28 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 public class DBRenderer {
 	
-	private final String url = "jdbc:mysql://localhost:3306/COURSES";
+	//private final String url = "jdbc:mysql://localhost:3306/";
 	private Connection conn = null;
+	private ArrayList<String> parseList = new ArrayList<String>(); // used for auto resizing
 	
 	public boolean databaseExists(String dbName) {
-		System.out.println("Checking if database COURSES exists...");
+		System.out.println("Checking if database exists...");
 		try (ResultSet resultSet = conn.getMetaData().getCatalogs()) {	
 			//iterate each catalog in the ResultSet
 			while (resultSet.next()) {
 			  // Get the database name, which is at position 1
 				if (dbName.toLowerCase().equals(resultSet.getString(1))) {
-					System.out.println("Database COURSES already exists.");
+					System.out.println("Database already exists.");
 					return true;
 				}
+				System.out.println("Database does not yet exist.");
 			}
 			resultSet.close();
 		} catch (SQLException se) {
@@ -31,14 +37,15 @@ public class DBRenderer {
 	}
 	
 	public boolean tableExists(String tableName) {
-		System.out.println("Checking if table SAMPLE exists...");
+		System.out.println("Checking if table " + tableName + " exists...");
 	    try (ResultSet rs = conn.getMetaData().getTables(null, null, tableName, null)) {
 	        while (rs.next()) { 
 	            String tName = rs.getString("TABLE_NAME");
 	            if (tName != null && tName.equals(tableName.toLowerCase())) {
-	        		System.out.println("Table SAMPLE already exists.");
+	        		System.out.println("Table " + tableName + " already exists.");
 	                return true;
 	            }
+        		System.out.println("Table " + tableName + " does not yet exist.");
 	        }
 	    } catch (SQLException se) {
 			se.printStackTrace();
@@ -55,14 +62,14 @@ public class DBRenderer {
 		}
 	}
 	
-	public void createDatabase() {
+	public void createDatabase(String dbName) {
 		Statement stmt = null;
-		connectToServer(url);
+		//connectToServer(url);
 		try {  
-			if (!databaseExists("COURSES")) {
+			if (!databaseExists(dbName)) {
 				System.out.println("Creating database...");
 				stmt = conn.createStatement();	      
-				String sql = "CREATE DATABASE COURSES";
+				String sql = "CREATE DATABASE " + dbName;
 				stmt.executeUpdate(sql);
 				System.out.println("Database created successfully...");
 			}
@@ -79,28 +86,42 @@ public class DBRenderer {
 	   System.out.println("Goodbye!");
 	}
 	
-	public void createTable() {
+	public void createTable(String tableName, String[] columns) {
 		Statement stmt = null;
 		try {	
-			if (!tableExists("SAMPLE")) {
-				stmt = conn.createStatement();		      
-				String sql = "CREATE TABLE SAMPLE(Course varchar(255),"
-			      		+ "GordonRule varchar(255),"
-			      		+ "GenEd varchar(255),"
-			      		+ "Section varchar(255),"
-			      		+ "ClassNum varchar(255),"
-			      		+ "MinMaxCred varchar(255),"
-			      		+ "Days varchar(255),"
-			      		+ "Time varchar(255),"
-			      		+ "MeetingPattern varchar(255),"
-			      		+ "Spec varchar(255),"
-			      		+ "SOC varchar(255),"
-			      		+ "CourseTitle varchar(255),"
-			      		+ "Instructor varchar(255),"
-			      		+ "EnrollmentCap varchar(255),"
-			      		+ "ScheduleCodes varchar(255))";
-				stmt.executeUpdate(sql);
-				System.out.println("Table created successfully...");
+			if (!tableExists(tableName)) {
+				stmt = conn.createStatement();
+				if (columns != null) {
+					String sql = "CREATE TABLE " + tableName + "(";
+					for (String s : columns) {
+		        		sql += ("`" + s + "`");
+		        		sql += " varchar(255),";
+		        	}
+		        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+					sql += ")";
+		        	sql = sql.replace("\\", ""); // filter escape characters
+		        	System.out.println(sql);
+							/*+ "(Course varchar(255),"
+				      		+ "GordonRule varchar(255),"
+				      		+ "GenEd varchar(255),"
+				      		+ "Section varchar(255),"
+				      		+ "ClassNum varchar(255),"
+				      		+ "MinMaxCred varchar(255),"
+				      		+ "Days varchar(255),"
+				      		+ "Time varchar(255),"
+				      		+ "MeetingPattern varchar(255),"
+				      		+ "Spec varchar(255),"
+				      		+ "SOC varchar(255),"
+				      		+ "CourseTitle varchar(255),"
+				      		+ "Instructor varchar(255),"
+				      		+ "EnrollmentCap varchar(255),"
+				      		+ "ScheduleCodes varchar(255))";*/
+					stmt.executeUpdate(sql);
+					System.out.println("Table " + tableName + " created successfully...");
+				}
+				else {
+					System.out.println("Failed to create table: " + tableName + ".");
+				}
 			}
 		}catch (SQLException se) {
 			   //Handle errors for JDBC
@@ -116,12 +137,32 @@ public class DBRenderer {
 		System.out.println("Goodbye!");
 	}
 	
-	public void insertRowInDB(Class rowItem) {
+	public void insertRowInDB(String tableName, Class rowItem) {
+		Set<Map.Entry<String, String>> rowData = rowItem.getData();
         PreparedStatement ps = null;
         try {
-	        String sql = "Insert into SAMPLE(Course,GordonRule,GenEd,Section,ClassNum,MinMaxCred,Days,Time,MeetingPattern,Spec,SOC,CourseTitle,Instructor,EnrollmentCap,ScheduleCodes) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	        // String sql = "Insert into SAMPLE(Course,GordonRule,GenEd,Section,ClassNum,MinMaxCred,Days,Time,MeetingPattern,Spec,SOC,CourseTitle,Instructor,EnrollmentCap,ScheduleCodes) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        	String sql = "Insert into " + tableName + "(";
+        	// The keys are our column labels
+        	for (Entry<String, String> entry : rowData) {
+        		sql += ("`" + entry.getKey() + "`");
+        		sql += ",";
+        	}
+        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+        	sql += ") values(";
+        	for (Entry<String, String> entry : rowData) {
+        		sql += "?,";
+        	}
+        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+        	sql += ")";
+        	sql = sql.replace("\\", ""); // filter escape characters
+        	System.out.println(sql);
 	        ps = conn.prepareStatement(sql);
-	        ps.setString(1, rowItem.course);
+	        int index = 1;
+	        for (Entry<String, String> entry : rowData) {
+        		ps.setString(index++, entry.getValue().toString());
+        	}
+	        /*ps.setString(1, rowItem.course);
 	        ps.setString(2, rowItem.gordonRule);
 	        ps.setString(3, rowItem.genEd);
 	        ps.setString(4, rowItem.section);
@@ -135,11 +176,25 @@ public class DBRenderer {
 	        ps.setString(12, rowItem.courseTitle);
 	        ps.setString(13, rowItem.instructor);
 	        ps.setString(14, rowItem.enrCap);
-	        ps.setString(15, rowItem.schedCodes);
+	        ps.setString(15, rowItem.schedCodes);*/
 	        ps.executeUpdate();
 	        System.out.println("Values Inserted Successfully");
         } catch (SQLException se) {
         	se.printStackTrace();
         }
     }
+	
+	// TODO: This needs to be stored persistently!
+	public void registerParsed(String tableName) {
+		parseList.add(tableName.toLowerCase());
+	}
+	
+	public boolean beenParsed(String tableName) {
+		for (String name : parseList) {
+			if (name.contentEquals(tableName.toLowerCase())) {
+				return true;
+			}
+		}
+		return false;
+	}
 }
