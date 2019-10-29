@@ -15,42 +15,12 @@ public class DBRenderer {
 	
 	//private final String url = "jdbc:mysql://localhost:3306/";
 	private Connection conn = null;
-	private ArrayList<String> parseList = new ArrayList<String>(); // used for auto resizing
+	private ArrayList<String> parseList = new ArrayList<String>(); // used ArrayList for its auto resizing
 	
-	public boolean databaseExists(String dbName) {
-		System.out.println("Checking if database exists...");
-		try (ResultSet resultSet = conn.getMetaData().getCatalogs()) {	
-			//iterate each catalog in the ResultSet
-			while (resultSet.next()) {
-			  // Get the database name, which is at position 1
-				if (dbName.toLowerCase().equals(resultSet.getString(1))) {
-					System.out.println("Database already exists.");
-					return true;
-				}
-				System.out.println("Database does not yet exist.");
-			}
-			resultSet.close();
-		} catch (SQLException se) {
-			se.printStackTrace();
-		}
-		return false;
-	}
-	
-	public boolean tableExists(String tableName) {
-		System.out.println("Checking if table " + tableName + " exists...");
-	    try (ResultSet rs = conn.getMetaData().getTables(null, null, tableName, null)) {
-	        while (rs.next()) { 
-	            String tName = rs.getString("TABLE_NAME");
-	            if (tName != null && tName.equals(tableName.toLowerCase())) {
-	        		System.out.println("Table " + tableName + " already exists.");
-	                return true;
-	            }
-        		System.out.println("Table " + tableName + " does not yet exist.");
-	        }
-	    } catch (SQLException se) {
-			se.printStackTrace();
-		}
-	    return false;
+	DBRenderer(String dbUrl, String dbName) {
+		connectToServer(dbUrl);	
+		createDatabase("SOC");
+		connectToServer(dbUrl + "SOC");
 	}
 	
 	public void connectToServer(String url) {
@@ -137,6 +107,42 @@ public class DBRenderer {
 		System.out.println("Goodbye!");
 	}
 	
+	public boolean databaseExists(String dbName) {
+		System.out.println("Checking if database exists...");
+		try (ResultSet resultSet = conn.getMetaData().getCatalogs()) {	
+			//iterate each catalog in the ResultSet
+			while (resultSet.next()) {
+			  // Get the database name, which is at position 1
+				if (dbName.toLowerCase().equals(resultSet.getString(1))) {
+					System.out.println("Database already exists.");
+					return true;
+				}
+			}
+			System.out.println("Database does not yet exist.");
+			resultSet.close();
+		} catch (SQLException se) {
+			se.printStackTrace();
+		}
+		return false;
+	}
+	
+	public boolean tableExists(String tableName) {
+		System.out.println("Checking if table " + tableName + " exists...");
+	    try (ResultSet rs = conn.getMetaData().getTables(null, null, tableName, null)) {
+	        while (rs.next()) { 
+	            String tName = rs.getString("TABLE_NAME");
+	            if (tName != null && tName.equals(tableName.toLowerCase())) {
+	        		System.out.println("Table " + tableName + " already exists.");
+	                return true;
+	            }
+        		System.out.println("Table " + tableName + " does not yet exist.");
+	        }
+	    } catch (SQLException se) {
+			se.printStackTrace();
+		}
+	    return false;
+	}
+	
 	public void insertRowInDB(String tableName, Class rowItem) {
 		Set<Map.Entry<String, String>> rowData = rowItem.getData();
         PreparedStatement ps = null;
@@ -183,6 +189,18 @@ public class DBRenderer {
         	se.printStackTrace();
         }
     }
+	
+	public ResultSet getTableEntries(String tableName) {
+		String sql = "SELECT * from " + tableName;
+		ResultSet rs = null;
+		try {
+			rs = conn.createStatement().executeQuery(sql);
+		} catch (SQLException se) {
+        	se.printStackTrace();
+        }
+    	return rs;
+	}
+	
 	
 	// TODO: This needs to be stored persistently!
 	public void registerParsed(String tableName) {

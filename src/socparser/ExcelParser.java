@@ -14,12 +14,12 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class ExcelParser {
-	public String[][] parseFile(String fileName, DBRenderer dbRenderer) {
+	public String[][] parseFile(String filePath, DBRenderer dbRenderer) {
 		System.out.println("Parsing file...");
 		String[][] data = null;
 		int numEmptyRows = 0;
 		try {		
-		    FileInputStream file = new FileInputStream(new File(fileName));
+		    FileInputStream file = new FileInputStream(new File(filePath));
 		    XSSFWorkbook workbook = new XSSFWorkbook(file);
 		    XSSFSheet sheet = workbook.getSheetAt(0);
 		    //Iterator<Row> rowIterator = sheet.iterator();

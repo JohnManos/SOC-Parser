@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.io.FilenameUtils;
 
 //import javafx.application.Application;
 //import javafx.event.ActionEvent;
@@ -58,19 +59,22 @@ import javafx.scene.control.Button;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableColumn.CellDataFeatures;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
+//import javafx.scene.control.TextField;
+//import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
+//import javafx.scene.layout.StackPane;
 
 
 public class Main extends Application {
 	private Desktop desktop = Desktop.getDesktop();
+	private File file = null;
 	private String fileName = null;
+	private String filePath = null;
 	private final String dbUrl = "jdbc:mysql://localhost:3306/";
-    private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
-    private Connection conn;
+	private ExcelParser parser = null;
+	private DBRenderer renderer = null;
+	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
     private TableView table = new TableView();
 
 	@Override
@@ -82,17 +86,18 @@ public class Main extends Application {
 		}
 	}	
 	private void createFileInputStage(Stage stage) {
-		stage.setTitle("Enter filename");
+		stage.setTitle("Home");
 		GridPane root = new GridPane();
 		//TextField fileInput = new TextField();
 		final FileChooser fileChooser = new FileChooser();
         final Button openButton = new Button("Open a Spreadsheet");
 		EventHandler<ActionEvent> event = new EventHandler<ActionEvent>() {
 			public void handle(ActionEvent e) {
-				File file = fileChooser.showOpenDialog(stage);
+				file = fileChooser.showOpenDialog(stage);
                 if (file != null) {
                     //openFile(file);
-                    fileName = file.getPath();
+                    fileName = FilenameUtils.getBaseName(file.getName());
+                    filePath = file.getPath();
                 }
 				//fileName = fileInput.getText();
 				//System.out.println(fileName);
@@ -100,10 +105,11 @@ public class Main extends Application {
 			}
 		};
 		openButton.setOnAction(event);
-		
-		//fileInput.setOnAction(event);
-		//root.getChildren().add(fileInput);
-		populateTable();
+		parser = new ExcelParser();
+		renderer = new DBRenderer(dbUrl, fileName);
+		if (fileName != null) {
+			populateTable();
+		}
 		GridPane.setConstraints(openButton, 0, 1);
 		GridPane.setConstraints(table, 0, 2);
 		GridPane.setVgrow(table, Priority.ALWAYS);
@@ -114,7 +120,7 @@ public class Main extends Application {
 		stage.show();
 	}
 	
-	private void openFile(File file) {
+	/*private void openFile(File file) {
         try {
             desktop.open(file);
         } catch (IOException ex) {
@@ -123,17 +129,13 @@ public class Main extends Application {
                     Level.SEVERE, null, ex
                 );
         }
-    }
+    }*/
 	
 	private void populateTable(){
-		Connection c ;
-        try{
-        	conn = DriverManager.getConnection(dbUrl + "Courses", "root", "8675309aA^");
-        	String sql = "SELECT * from Sample";
-        	ResultSet rs = conn.createStatement().executeQuery(sql);
-		
+        try{        	
+        	ResultSet rs = renderer.getTableEntries(fileName);
         	// Create columns based on sql table and add to tableView
-        	for(int i=0 ; i<rs.getMetaData().getColumnCount(); i++){
+        	for(int i = 0 ; i < rs.getMetaData().getColumnCount(); i++){
         		final int j = i; // The factory below requires a final (or effectively final) variable to be used
         		TableColumn col = new TableColumn(rs.getMetaData().getColumnName(i+1));
         		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
@@ -161,18 +163,17 @@ public class Main extends Application {
         	table.setItems(data);
         }catch (Exception e) {
         	e.printStackTrace();
-        	System.out.println("Error populating table.");             
+        	System.err.println("Error populating table.");  
+        	if (renderer == null) {
+        		System.err.println("Renderer not initialized.");  
+        	}
         }
     }
 	
 	private void parseAndRender() {
-		ExcelParser parser = new ExcelParser();
-		DBRenderer renderer = new DBRenderer();
-		renderer.connectToServer(dbUrl);
-		renderer.createDatabase("Courses");
-		renderer.connectToServer(dbUrl + "Courses");
-		if (!renderer.beenParsed("Sample")) {
-			String[][] dataArray = parser.parseFile(fileName, renderer);
+		if (!renderer.beenParsed(fileName)) {
+			String[][] dataArray = parser.parseFile(filePath, renderer);
+			//TODO: this should be a DBRenderer method. DBRenderer should take a 2D data array in its constructor
 			String[] labels = new String[dataArray[0].length];
 			int rowIndex = 0;
 			for (String[] row : dataArray) {
@@ -183,7 +184,7 @@ public class Main extends Application {
 						labels[i] = row[i];
 					}
 					// This is called here because it needs an instance of the row's object to determine column names, but need only be called once
-					renderer.createTable("Sample", labels);
+					renderer.createTable(fileName, labels);
 				}
 				else {
 					// create key/vale pair for each cell
@@ -191,12 +192,12 @@ public class Main extends Application {
 						rowObject.add(labels[i], row[i]);;
 					}
 					// Only add row into database if it is not the label row
-					renderer.insertRowInDB("Sample", rowObject);
+					renderer.insertRowInDB(fileName, rowObject);
 				}
 				++rowIndex;
 				
 			}
-			renderer.registerParsed("Sample");
+			renderer.registerParsed(fileName);
 		} else System.out.println("File already in database.");
 	}
 	
