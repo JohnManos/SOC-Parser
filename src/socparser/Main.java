@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.io.FilenameUtils;
@@ -77,6 +78,7 @@ public class Main extends Application {
 	private DBRenderer renderer = null;
 	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
     private TableView table = new TableView();
+    private boolean displayed = false;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -131,15 +133,16 @@ public class Main extends Application {
     }*/
 	
 	private void populateTable(){
-        try{        	
+		ResultSet rs = renderer.getTableEntries(fileName);
+        if (!displayed) {   
+        	
         	// TODO: refactor the following into a DBRenderer method that takes the filename and 'keys' as params (in this case, Sect and Class Nbr)
         	// TODO: fix critical bug in which some rows do not get concatenated properly
-        	ResultSet rs = renderer.getTableEntries(fileName);
         	// Construct the SQL query used to reorganize the soc data
-        	String label = null;
+        	String[] labels = renderer.getColumnNames(fileName);
 			String sql = "SELECT";
-        	for(int i = 0 ; i < rs.getMetaData().getColumnCount(); i++){
-        		label = (rs.getMetaData().getColumnName(i+1));
+        	for(int i = 0 ; i < labels.length; i++){
+        		String label = labels[i];
 				//sql += ("uPDATE " + fileName + " t1, " + fileName + " t2 SET label = CONCAT_WS(t1.`" + label + "`, t2.`" + label + "`) WHERE t1.Sect <> t2.`" + label + "`");
         		sql += (" IF(t1.`" + label + "` = t2.`" + label + "`, t1.`" + label + "`, GROuP_CONCAT(DISTINCT t1.`" + label + "` SEPARATOR ' ')),");				
         		//sql += (" IF(`" + label + "` = Sect OR `" + label + "` = `Class Nbr`, `" + label + "`, GROuP_CONCAT(DISTINCT t1.`" + label + "` SEPARATOR ' ')),");				
@@ -152,46 +155,52 @@ public class Main extends Application {
 				rs = renderer.getConnection().createStatement().executeQuery(sql);
 			} catch (SQLException se) {
 				se.printStackTrace();
+	        	System.err.println("Error populating table.");  
+	        	if (renderer == null) {
+	        		System.err.println("Renderer not initialized.");  
+	        	}
 			}
-        	// Create columns based on sql table and add to tableView
-        	String[] colNames = renderer.getColumnNames(fileName);
-        	for(int i = 0 ; i < colNames.length; i++){
-        		final int j = i; // The factory below requires a final (or effectively final) variable to be used
-        		TableColumn col = new TableColumn(colNames[i]);
-        		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
-        		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
-        		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
-        		// Filling a table using observables never looks clean but man does JavaFX take the cake.
-        		col.setCellValueFactory(new Callback<CellDataFeatures<ObservableList,String>, ObservableValue<String>>(){
-        			public ObservableValue<String> call(CellDataFeatures<ObservableList, String> param) {
-        				return new SimpleStringProperty(param.getValue().get(j).toString());
-        			}
-        		});		
-        		table.getColumns().addAll(col); 
-        		//System.out.println("Column [" + i +"] ");
-        	}
 
-        	// Gather data into ObservableList to add to populate table
-        	while(rs.next()){
-        		ObservableList<String> row = FXCollections.observableArrayList();
-        		for(int i=1 ; i<=rs.getMetaData().getColumnCount(); i++){
-        			row.add(rs.getString(i));
-        		}
-        		//System.out.println("Row added " + row );
-        		data.add(row);
-        	}
-        	table.setItems(data);
-        }catch (Exception e) {
-        	e.printStackTrace();
-        	System.err.println("Error populating table.");  
-        	if (renderer == null) {
-        		System.err.println("Renderer not initialized.");  
-        	}
+	    	// Create columns based on sql table and add to tableView
+	    	String[] colNames = renderer.getColumnNames(fileName);
+	    	for(int i = 0 ; i < colNames.length; i++){
+	    		final int j = i; // The factory below requires a final (or effectively final) variable to be used
+	    		TableColumn col = new TableColumn(colNames[i]);
+	    		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
+	    		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
+	    		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
+	    		// Filling a table using observables never looks clean but man does JavaFX take the cake.
+	    		col.setCellValueFactory(new Callback<CellDataFeatures<ObservableList,String>, ObservableValue<String>>(){
+	    			public ObservableValue<String> call(CellDataFeatures<ObservableList, String> param) {
+	    				return new SimpleStringProperty(param.getValue().get(j).toString());
+	    			}
+	    		});		
+	    		table.getColumns().addAll(col); 
+	    		//System.out.println("Column [" + i +"] ");
+	    	}
+	
+	    	// Gather data into ObservableList to add to populate table
+	    	try {
+				while(rs.next()){
+					ObservableList<String> row = FXCollections.observableArrayList();
+					for(int i=1 ; i<=rs.getMetaData().getColumnCount(); i++){
+						row.add(rs.getString(i));
+					}
+					//System.out.println("Row added " + row );
+					data.add(row);
+				}
+			} catch (SQLException se) {
+				se.printStackTrace();
+	        	System.err.println("Error populating table.");  
+	        	System.err.println("Error retrieving from table " + fileName);  
+			}
+	    	table.setItems(data);
+	    	displayed = true;
         }
-    }
+	}
 	
 	private void parseAndRender() {
-		if (!renderer.beenParsed(fileName)) {
+		if (!renderer.tableExists(fileName)) {
 			String[][] dataArray = parser.parseFile(filePath, renderer);
 			//TODO: this should be a DBRenderer method. DBRenderer should take a 2D data array in its constructor
 			String[] labels = new String[dataArray[0].length]; // The first nonempty row is the column labels
@@ -216,7 +225,7 @@ public class Main extends Application {
 				}
 				++rowIndex;				
 			}
-			renderer.registerParsed(fileName);
+			//renderer.registerParsed(fileName);
 		} else System.out.println("File already in database.");
 	}
 	

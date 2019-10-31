@@ -219,16 +219,16 @@ public class DBRenderer {
 		return result;
 	}
 	// TODO: This needs to be stored persistently!
-	public void registerParsed(String tableName) {
+	/*public void registerParsed(String tableName) {
 		parseList.add(tableName.toLowerCase());
 	}
-	
-	public boolean beenParsed(String tableName) {
+	*/
+	/*public boolean beenParsed(String tableName) {
 		for (String name : parseList) {
 			if (name.contentEquals(tableName.toLowerCase())) {
 				return true;
 			}
 		}
 		return false;
-	}
+	}*/
 }
