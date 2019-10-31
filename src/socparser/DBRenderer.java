@@ -19,8 +19,12 @@ public class DBRenderer {
 	
 	DBRenderer(String dbUrl, String dbName) {
 		connectToServer(dbUrl);	
-		createDatabase("SOC");
-		connectToServer(dbUrl + "SOC");
+		createDatabase(dbName);
+		connectToServer(dbUrl + dbName);
+	}
+	
+	public Connection getConnection() {
+		return this.conn;
 	}
 	
 	public void connectToServer(String url) {
@@ -201,7 +205,19 @@ public class DBRenderer {
     	return rs;
 	}
 	
-	
+	public String[] getColumnNames(String tableName) {
+		String[] result = null;
+		try {
+			ResultSet rs = getTableEntries(tableName);		
+			result = new String[rs.getMetaData().getColumnCount()];
+			for(int i = 0 ; i < result.length; i++) {
+				result[i] = rs.getMetaData().getColumnName(i+1);
+			}
+		} catch (SQLException se) {
+			se.printStackTrace();
+		}
+		return result;
+	}
 	// TODO: This needs to be stored persistently!
 	public void registerParsed(String tableName) {
 		parseList.add(tableName.toLowerCase());

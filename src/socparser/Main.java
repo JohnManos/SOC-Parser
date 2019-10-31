@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.io.FilenameUtils;
@@ -102,14 +103,12 @@ public class Main extends Application {
 				//fileName = fileInput.getText();
 				//System.out.println(fileName);
 				parseAndRender();
+    			populateTable();
 			}
 		};
 		openButton.setOnAction(event);
 		parser = new ExcelParser();
-		renderer = new DBRenderer(dbUrl, fileName);
-		if (fileName != null) {
-			populateTable();
-		}
+		renderer = new DBRenderer(dbUrl, "SOC");
 		GridPane.setConstraints(openButton, 0, 1);
 		GridPane.setConstraints(table, 0, 2);
 		GridPane.setVgrow(table, Priority.ALWAYS);
@@ -133,11 +132,32 @@ public class Main extends Application {
 	
 	private void populateTable(){
         try{        	
+        	// TODO: refactor the following into a DBRenderer method that takes the filename and 'keys' as params (in this case, Sect and Class Nbr)
+        	// TODO: fix critical bug in which some rows do not get concatenated properly
         	ResultSet rs = renderer.getTableEntries(fileName);
-        	// Create columns based on sql table and add to tableView
+        	// Construct the SQL query used to reorganize the soc data
+        	String label = null;
+			String sql = "SELECT";
         	for(int i = 0 ; i < rs.getMetaData().getColumnCount(); i++){
+        		label = (rs.getMetaData().getColumnName(i+1));
+				//sql += ("uPDATE " + fileName + " t1, " + fileName + " t2 SET label = CONCAT_WS(t1.`" + label + "`, t2.`" + label + "`) WHERE t1.Sect <> t2.`" + label + "`");
+        		sql += (" IF(t1.`" + label + "` = t2.`" + label + "`, t1.`" + label + "`, GROuP_CONCAT(DISTINCT t1.`" + label + "` SEPARATOR ' ')),");				
+        		//sql += (" IF(`" + label + "` = Sect OR `" + label + "` = `Class Nbr`, `" + label + "`, GROuP_CONCAT(DISTINCT t1.`" + label + "` SEPARATOR ' ')),");				
+				// sql += (" CASE WHEN `t1." + label + "` = `t2." + label + "` THEN `t1." + label + "` WHEN `t1." + label + "` <> `t2." + label + "` THEN CONCAT_WS(`t1." + label + "`,`t2." + label + "`) END,");				
+        	}
+        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+        	sql += (" FROM `" + fileName + "` t1 JOIN `" + fileName + "` t2 ON t1.Sect = t2.Sect AND t1.`Class Nbr` = t2.`Class Nbr` GROUP BY t1.Sect, t1.`Class Nbr`");
+        	System.out.println(sql);
+        	try {
+				rs = renderer.getConnection().createStatement().executeQuery(sql);
+			} catch (SQLException se) {
+				se.printStackTrace();
+			}
+        	// Create columns based on sql table and add to tableView
+        	String[] colNames = renderer.getColumnNames(fileName);
+        	for(int i = 0 ; i < colNames.length; i++){
         		final int j = i; // The factory below requires a final (or effectively final) variable to be used
-        		TableColumn col = new TableColumn(rs.getMetaData().getColumnName(i+1));
+        		TableColumn col = new TableColumn(colNames[i]);
         		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
         		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
         		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
@@ -174,11 +194,11 @@ public class Main extends Application {
 		if (!renderer.beenParsed(fileName)) {
 			String[][] dataArray = parser.parseFile(filePath, renderer);
 			//TODO: this should be a DBRenderer method. DBRenderer should take a 2D data array in its constructor
-			String[] labels = new String[dataArray[0].length];
-			int rowIndex = 0;
+			String[] labels = new String[dataArray[0].length]; // The first nonempty row is the column labels
+			int rowIndex = 0; // keeps track of the row number, so that row 0 is only used for column names
 			for (String[] row : dataArray) {
 				Class rowObject = new Class();
-				// First data row is labels, so retrieve them to use as keys
+				// Retrieve the column labels from the parse result and store to use as key in rowObject
 				if (rowIndex == 0) {
 					for (int i = 0; i < row.length; i++) {
 						labels[i] = row[i];
@@ -187,15 +207,14 @@ public class Main extends Application {
 					renderer.createTable(fileName, labels);
 				}
 				else {
-					// create key/vale pair for each cell
+					// create key/value pair for each cell
 					for (int i = 0; i < row.length; i++) {
 						rowObject.add(labels[i], row[i]);;
 					}
 					// Only add row into database if it is not the label row
 					renderer.insertRowInDB(fileName, rowObject);
 				}
-				++rowIndex;
-				
+				++rowIndex;				
 			}
 			renderer.registerParsed(fileName);
 		} else System.out.println("File already in database.");
