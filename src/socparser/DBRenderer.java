@@ -1,5 +1,6 @@
 package socparser;
 
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -194,6 +195,21 @@ public class DBRenderer {
         }
     }
 	
+	public ArrayList<String> getTableNames() {
+		ArrayList<String> result = new ArrayList<String>();
+		ResultSet rs = null;
+		try {
+			rs = conn.getMetaData().getTables("SOC", null, null, null);
+			while (rs.next()) {              
+			   result.add(rs.getString(3));
+			}
+		}
+		catch(SQLException se) {
+			se.printStackTrace();
+		}
+		return result;
+	}
+	
 	public ResultSet getTableEntries(String tableName) {
 		String sql = "SELECT * from " + tableName;
 		ResultSet rs = null;
@@ -211,7 +227,7 @@ public class DBRenderer {
 			ResultSet rs = getTableEntries(tableName);		
 			result = new String[rs.getMetaData().getColumnCount()];
 			for(int i = 0 ; i < result.length; i++) {
-				result[i] = rs.getMetaData().getColumnName(i+1);
+				result[i] = rs.getMetaData().getColumnLabel(i+1);
 			}
 		} catch (SQLException se) {
 			se.printStackTrace();
