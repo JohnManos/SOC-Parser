@@ -37,6 +37,8 @@ import javafx.scene.layout.ColumnConstraints;
 //import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.text.Text;
 //import javafx.scene.layout.StackPane;
 
 
@@ -50,7 +52,7 @@ public class Main extends Application {
 	private ExcelParser parser = null;
 	private DBRenderer renderer = null;
 	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
-    private TableView table = new TableView();
+    private TableView<ObservableList<String>> table = new TableView<ObservableList<String>>();
     private boolean displayed = false;
     private boolean viaParseButton = false; /// TODO: the need for this bool is likely indicative of design flaw
 
@@ -127,7 +129,7 @@ public class Main extends Application {
 		GridPane.setConstraints(table, 0, 1);
 		GridPane.setColumnSpan(table, 6);
 		GridPane.setVgrow(table, Priority.ALWAYS);
-		GridPane.setHgrow(table, Priority.ALWAYS);
+		//GridPane.setHgrow(table, Priority.ALWAYS);
 		root.getChildren().addAll(openButton, resetButton, choiceBox, table);
 		ColumnConstraints col1Constraints = new ColumnConstraints();
 		col1Constraints.setPercentWidth(16.66);
@@ -143,6 +145,8 @@ public class Main extends Application {
 	private void populateTable(){
 		ResultSet rs;
         if (!displayed) {      	
+        	//table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        	//table.requestLayout();
         	// TODO: refactor the following into a DBRenderer method that takes the filename and 'keys' as params (in this case, Sect and Class Nbr)
         	// TODO: fix critical bug in which some rows do not get concatenated properly
         	// Construct the SQL query used to reorganize the soc data
@@ -197,6 +201,7 @@ public class Main extends Application {
 		    		Button hide = new Button(rsmd.getColumnLabel(i));
 		    		hide.setOnAction(hideEvent);
 		    		col.setGraphic(hide);
+			        hide.setMinWidth(Button.USE_PREF_SIZE);
 		    		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
 		    		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
 		    		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
@@ -227,23 +232,54 @@ public class Main extends Application {
         	
 	    	table.setItems(data);
 	    	displayed = true;
+	    	autoResizeColumns();
+	    	//table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+	    	//table.requestLayout();
         }
+	}
+	
+	private void autoResizeColumns() {
+	    //Set the right policy
+	    table.setColumnResizePolicy( TableView.UNCONSTRAINED_RESIZE_POLICY);
+	    table.getColumns().stream().forEach( (column) -> {
+	        //Minimal width = column header , which since it is a button, is considered a Graphic
+	        Node n = column.getGraphic();
+	        Text t = new Text(((Button)n).getText().toString());
+	        final double max1 = t.getLayoutBounds().getWidth();
+	        double max2 = max1;
+	        for ( int i = 0; i < table.getItems().size(); i++ ) {
+	            //cell must not be empty
+	            if (column.getCellData(i) != null) {
+	                t = new Text(column.getCellData( i ).toString());
+	                double calcwidth = t.getLayoutBounds().getWidth();
+	                //remember new max-width
+	                if (calcwidth > max2) {
+	                    max2 = calcwidth;
+	                }
+	            }
+	        }
+	        //set the new max-width with some extra space
+	        column.setMinWidth(max1 + 30.0d); // min width is that of column header button
+	        column.setPrefWidth(max2 + 30.0d); // default width is that of largest body cell content
+	    });
 	}
 	
 	private void parseAndRender() {
 		String[][] dataArray = parser.parseFile(filePath, renderer);
 		//TODO: this should be a DBRenderer method. DBRenderer should take a 2D data array in its constructor
-		String[] labels = new String[dataArray[0].length + 1]; // The first nonempty row is the column labels
+		String[] labels = new String[dataArray[0].length + 2]; // The first nonempty row is the column labels
 		int rowIndex = 0; // keeps track of the row number, so that row 0 is only used for column names, and to populate Id column
 		for (String[] row : dataArray) {
 			Class rowObject = new Class();
 			// Retrieve the column labels from the parse result and store to use as key in rowObject
 			if (rowIndex == 0) {
-				labels[0] = "Id"; // We need the first column to be an Id that is not in the parsed spreadsheet
+				labels[0] = "Id"; // We need the first column to be an Id (there is no ID in the parsed spreadsheet)
 				for (int i = 0; i < row.length; i++) {
 					labels[i + 1] = row[i];
 				}
-				// This is called here because it needs an instance of the row's object to determine column names, but need only be called once
+				// Add another column label for comments
+				labels[labels.length - 1] = "Comments";
+				// This is called here because it needs the column names, but need only be called once
 				renderer.createTable(fileName, labels);
 			}
 			else {
@@ -252,6 +288,7 @@ public class Main extends Application {
 				for (int i = 0; i < row.length; i++) {
 					rowObject.add(labels[i + 1], row[i]); // everything else comes from the parsed sheet
 				}
+				rowObject.add(labels[labels.length - 1], "");
 				// Only add row into database if it is not the label row
 				renderer.insertRowInDB(fileName, rowObject);
 			}
