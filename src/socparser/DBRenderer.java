@@ -234,6 +234,21 @@ public class DBRenderer {
 		}
 		return result;
 	}
+	public void update(String tableName, String id, String[] columns, String[] values) throws SQLException {
+		if (columns.length != values.length) {
+			throw new SQLException();
+		}
+		else {
+	        String sql = "UPDATE " + tableName + " SET ";
+	        for (int i = 0; i < columns.length; i++) {
+	        	sql += (columns[i] + " = ");
+	        	sql += ("\"" + values[i] + "\" ");
+	        }
+	        sql += "WHERE id = " + id;
+	        System.out.println(sql);
+	        conn.prepareStatement(sql).execute();
+		}
+	}
 	// TODO: This needs to be stored persistently!
 	/*public void registerParsed(String tableName) {
 		parseList.add(tableName.toLowerCase());

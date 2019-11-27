@@ -21,6 +21,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
+import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -29,9 +30,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableColumn.CellDataFeatures;
+import javafx.scene.control.TableColumn.CellEditEvent;
 import javafx.scene.control.TableView;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.ColumnConstraints;
 //import javafx.scene.control.TextField;
 //import javafx.scene.layout.BorderPane;
@@ -110,8 +115,11 @@ public class Main extends Application {
 		final Button resetButton = new Button("Unhide all columns");
 		EventHandler<ActionEvent> resetEvent = new EventHandler<ActionEvent>() {
 			public void handle(ActionEvent e) {
-				for (Object col : table.getColumns())
+				int i = 0;
+				for (Object col : table.getColumns()) {
+					if (i++ == 0) continue;
 					((TableColumn) col).setVisible(true);
+				}
 			}
 		};
 		resetButton.setOnAction(resetEvent);
@@ -125,6 +133,7 @@ public class Main extends Application {
 		GridPane.setColumnSpan(table, 6);
 		GridPane.setVgrow(table, Priority.ALWAYS);
 		//GridPane.setHgrow(table, Priority.ALWAYS);
+		table.setEditable(true);
 		root.getChildren().addAll(openButton, resetButton, choiceBox, table);
 		ColumnConstraints col1Constraints = new ColumnConstraints();
 		col1Constraints.setPercentWidth(16.66);
@@ -153,10 +162,10 @@ public class Main extends Application {
         	for(int i = 0 ; i < labels.length; i++){
         		String label = labels[i];
 				//sql += ("uPDATE " + fileName + " t1, " + fileName + " t2 SET label = CONCAT_WS(t1.`" + label + "`, t2.`" + label + "`) WHERE t1.Sect <> t2.`" + label + "`");
-        		if (label.equals("Id")) {
+        		/*if (label.equals("Id")) {
         			continue;
-        		}
-        		else if (label.equals("`Class Nbr`") || label.equals("Sect")) {
+        		}*/
+        		if (label.equals("`Class Nbr`") || label.equals("Sect")) {
         			sql += (" `" + label + "`,");
         		}
         		else if (label.equals("Day/s")) {
@@ -189,7 +198,7 @@ public class Main extends Application {
 	        	ResultSetMetaData rsmd = rs.getMetaData();
 		    	for(int i = 1; i <= rsmd.getColumnCount(); i++){
 		    		final int j = i - 1; // The factory below requires a final (or effectively final) variable to be used
-		    		TableColumn col = new TableColumn();
+		    		TableColumn<ObservableList<String>, String> col = new TableColumn<ObservableList<String>, String>();
 		    		EventHandler<ActionEvent> hideEvent = new EventHandler<ActionEvent>() {
 		    			public void handle(ActionEvent e) {
 		    				col.setVisible(false);
@@ -199,14 +208,49 @@ public class Main extends Application {
 		    		hide.setOnAction(hideEvent);
 		    		col.setGraphic(hide);
 			        hide.setMinWidth(Button.USE_PREF_SIZE);
+			        EventHandler<CellEditEvent<ObservableList<String>, String>> saveThatShitBoi = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
+			        	public void handle(CellEditEvent<ObservableList<String>, String> e) {
+			        		System.out.println("We did it boiz");
+			        		ObservableList<String> row = e.getRowValue();
+			        		String idString = row.get(0);
+			        		String[] ids = idString.split(" ");
+			        		String[] comment = {e.getNewValue()};
+			        		String[] column = {"Comments"};
+			        		for (String id : ids) {
+				        		try {
+				        			renderer.update(fileName, id, column, comment);
+				        		} catch(SQLException se) {
+				        			se.printStackTrace();
+				        		}		
+			        		}
+			        	}
+			        };
+			        if (((Button)col.getGraphic()).getText().equals("Comments")) {
+			        	col.setCellFactory(TextFieldTableCell.forTableColumn());
+			        	col.addEventHandler(TableColumn.editCommitEvent(), saveThatShitBoi);
+			        }
+			        /*Callback<TableColumn<ObservableList<String>, String>, TableCell<ObservableList<String>, String>> defaultTextFieldCellFactory 
+		            = TextFieldTableCell.<ObservableList<String>>forTableColumn();
+			        if (col.getText() == "Comments") {
+			        	col.setEditable(true);
+			        	col.setCellFactory(column -> {
+			        		EditingCell cell = (EditingCell) defaultTextFieldCellFactory.call(column);
+			        		cell.itemProperty().addListener((obs, oldValue, newValue) -> {
+			        			cell.setEditable(true);
+			        		});
+			        		return cell;
+			        	});
+			        }*/
 		    		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
 		    		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
 		    		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
-		    		col.setCellValueFactory(new Callback<CellDataFeatures<ObservableList,String>, ObservableValue<String>>(){
-		    			public ObservableValue<String> call(CellDataFeatures<ObservableList, String> param) {
+		    		col.setCellValueFactory(new Callback<CellDataFeatures<ObservableList<String>,String>, ObservableValue<String>>(){
+		    			public ObservableValue<String> call(CellDataFeatures<ObservableList<String>, String> param) {
 		    				return new SimpleStringProperty(param.getValue().get(j).toString());
 		    			}
 		    		});	
+		    		
+		    		
 		    		table.getColumns().addAll(col); 
 		    		//System.out.println("Column [" + i +"] ");
 		    	}
@@ -216,9 +260,16 @@ public class Main extends Application {
 					ObservableList<String> row = FXCollections.observableArrayList();
 					for(int i = 1 ; i <= rsmd.getColumnCount(); i++){
 						row.add(rs.getString(i));
+						if(rsmd.getColumnName(i) == "Comments") {
+						}
 					}
 					//System.out.println("Row added " + row );
 					data.add(row);
+					for(int i = 1 ; i <= rsmd.getColumnCount(); i++){
+						if(rsmd.getColumnName(i) == "Comments") {
+							//data[i][].set
+						}
+					}					
 				}
 				
 			} catch (SQLException se) {
@@ -264,8 +315,7 @@ public class Main extends Application {
 	
 	private void parseAndRender() {
 		String[][] dataArray = parser.parseFile(filePath, renderer);
-		//TODO: this should be a DBRenderer method. DBRenderer should take a 2D data array in its constructor
-		String[] labels = new String[dataArray[0].length + 2]; // The first nonempty row is the column labels
+		String[] labels = new String[dataArray[0].length + 2]; // plus two because we are adding an id column and a comments column
 		int rowIndex = 0; // keeps track of the row number, so that row 0 is only used for column names, and to populate Id column
 		for (String[] row : dataArray) {
 			Class rowObject = new Class();
