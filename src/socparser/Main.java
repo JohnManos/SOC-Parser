@@ -75,8 +75,6 @@ public class Main extends Application {
 		
 		ChoiceBox choiceBox = new ChoiceBox();
 	    choiceBox.setItems(tableNames);
-	    // Label to display the selected menuitem 
-        //Label selected = new Label("default item selected"); 
         choiceBox.getSelectionModel().selectedIndexProperty().addListener(new ChangeListener<Number>() {
         	public void changed(ObservableValue ov, Number value, Number newValue) { 
             	fileName = tableNames.get(newValue.intValue());
@@ -94,11 +92,8 @@ public class Main extends Application {
 			public void handle(ActionEvent e) {
 				file = fileChooser.showOpenDialog(stage);
                 if (file != null) {
-                    //openFile(file);
                     fileName = FilenameUtils.getBaseName(file.getName());
                     filePath = file.getPath();
-    				//fileName = fileInput.getText();
-    				//System.out.println(fileName);
             		if (!renderer.tableExists(fileName)) {
 	                    parseAndRender();
 	        			//populateTable();
@@ -151,6 +146,8 @@ public class Main extends Application {
         	// TODO: fix critical bug in which some rows do not get concatenated properly
         	// Construct the SQL query used to reorganize the soc data
     		data.removeAll(data);
+    		table.getColumns().clear();
+    		//table.refresh();
         	String[] labels = renderer.getColumnNames(fileName);
 			String sql = "SELECT";
         	for(int i = 0 ; i < labels.length; i++){
@@ -231,6 +228,7 @@ public class Main extends Application {
 			}
         	
 	    	table.setItems(data);
+	    	//table.refresh();
 	    	displayed = true;
 	    	autoResizeColumns();
 	    	//table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
