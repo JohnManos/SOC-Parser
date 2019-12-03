@@ -18,10 +18,10 @@ public class DBRenderer {
 	private Connection conn = null;
 	private ArrayList<String> parseList = new ArrayList<String>(); // used ArrayList for its auto resizing
 	
-	DBRenderer(String dbUrl, String dbName) {
+	DBRenderer(String dbUrl) {
 		connectToServer(dbUrl);	
-		createDatabase(dbName);
-		connectToServer(dbUrl + dbName);
+		//createDatabase(dbName);
+		//connectToServer(dbUrl + dbName);
 	}
 	
 	public Connection getConnection() {
@@ -31,9 +31,10 @@ public class DBRenderer {
 	public void connectToServer(String url) {
 		System.out.println("Connecting to server...");
 		try {
-		    conn = DriverManager.getConnection(url, "root", "8675309aA^");
-		}catch (SQLException se) {
-			se.printStackTrace();
+			//Class.forName(driver);
+		    conn = DriverManager.getConnection(url);
+		}catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -67,30 +68,15 @@ public class DBRenderer {
 			if (!tableExists(tableName)) {
 				stmt = conn.createStatement();
 				if (columns != null) {
-					String sql = "CREATE TABLE " + tableName + "(";
+					String sql = "CREATE TABLE \"" + tableName + "\"(";
 					for (String s : columns) {
-		        		sql += ("`" + s + "`");
+		        		sql += ("\"" + s + "\"");
 		        		sql += " varchar(255),";
 		        	}
 		        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
 					sql += ")";
 		        	sql = sql.replace("\\", ""); // filter escape characters
 		        	System.out.println(sql);
-							/*+ "(Course varchar(255),"
-				      		+ "GordonRule varchar(255),"
-				      		+ "GenEd varchar(255),"
-				      		+ "Section varchar(255),"
-				      		+ "ClassNum varchar(255),"
-				      		+ "MinMaxCred varchar(255),"
-				      		+ "Days varchar(255),"
-				      		+ "Time varchar(255),"
-				      		+ "MeetingPattern varchar(255),"
-				      		+ "Spec varchar(255),"
-				      		+ "SOC varchar(255),"
-				      		+ "CourseTitle varchar(255),"
-				      		+ "Instructor varchar(255),"
-				      		+ "EnrollmentCap varchar(255),"
-				      		+ "ScheduleCodes varchar(255))";*/
 					stmt.executeUpdate(sql);
 					System.out.println("Table " + tableName + " created successfully...");
 				}
@@ -133,30 +119,30 @@ public class DBRenderer {
 	
 	public boolean tableExists(String tableName) {
 		System.out.println("Checking if table " + tableName + " exists...");
-	    try (ResultSet rs = conn.getMetaData().getTables(null, null, tableName, null)) {
+	    try (ResultSet rs = conn.getMetaData().getTables(null, null, null, null)) {
 	        while (rs.next()) { 
 	            String tName = rs.getString("TABLE_NAME");
-	            if (tName != null && tName.equals(tableName.toLowerCase())) {
+	            if (tName != null && tName.toLowerCase().equals(tableName.toLowerCase())) {
 	        		System.out.println("Table " + tableName + " already exists.");
 	                return true;
 	            }
-        		System.out.println("Table " + tableName + " does not yet exist.");
 	        }
+    		System.out.println("Table " + tableName + " does not yet exist.");
 	    } catch (SQLException se) {
 			se.printStackTrace();
 		}
 	    return false;
 	}
 	
-	public void insertRowInDB(String tableName, Class rowItem) {
+	public void insertRowInDB(String tableName, RowObject rowItem) {
 		Set<Map.Entry<String, String>> rowData = rowItem.getData();
         PreparedStatement ps = null;
         try {
 	        // String sql = "Insert into SAMPLE(Course,GordonRule,GenEd,Section,ClassNum,MinMaxCred,Days,Time,MeetingPattern,Spec,SOC,CourseTitle,Instructor,EnrollmentCap,ScheduleCodes) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-        	String sql = "Insert into " + tableName + "(";
+        	String sql = "Insert into \"" + tableName + "\"(";
         	// The keys are our column labels
         	for (Entry<String, String> entry : rowData) {
-        		sql += ("`" + entry.getKey() + "`");
+        		sql += ("\"" + entry.getKey() + "\"");
         		sql += ",";
         	}
         	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
@@ -173,21 +159,6 @@ public class DBRenderer {
 	        for (Entry<String, String> entry : rowData) {
         		ps.setString(index++, entry.getValue().toString());
         	}
-	        /*ps.setString(1, rowItem.course);
-	        ps.setString(2, rowItem.gordonRule);
-	        ps.setString(3, rowItem.genEd);
-	        ps.setString(4, rowItem.section);
-	        ps.setString(5, rowItem.classNum);
-	        ps.setString(6, rowItem.minMaxCred);
-	        ps.setString(7, rowItem.days);
-	        ps.setString(8, rowItem.time);
-	        ps.setString(9, rowItem.meetingPattern);
-	        ps.setString(10, rowItem.spec);
-	        ps.setString(11, rowItem.soc);
-	        ps.setString(12, rowItem.courseTitle);
-	        ps.setString(13, rowItem.instructor);
-	        ps.setString(14, rowItem.enrCap);
-	        ps.setString(15, rowItem.schedCodes);*/
 	        ps.executeUpdate();
 	        System.out.println("Values Inserted Successfully");
         } catch (SQLException se) {
@@ -199,7 +170,7 @@ public class DBRenderer {
 		ArrayList<String> result = new ArrayList<String>();
 		ResultSet rs = null;
 		try {
-			rs = conn.getMetaData().getTables("SOC", null, null, null);
+			rs = conn.getMetaData().getTables("SOCPARSER", "PUBLIC", null, null);
 			while (rs.next()) {              
 			   result.add(rs.getString(3));
 			}
@@ -211,7 +182,7 @@ public class DBRenderer {
 	}
 	
 	public ResultSet getTableEntries(String tableName) {
-		String sql = "SELECT * from " + tableName;
+		String sql = "SELECT * from \"" + tableName + "\"";
 		ResultSet rs = null;
 		try {
 			rs = conn.createStatement().executeQuery(sql);
@@ -234,32 +205,20 @@ public class DBRenderer {
 		}
 		return result;
 	}
+	
 	public void update(String tableName, String id, String[] columns, String[] values) throws SQLException {
 		if (columns.length != values.length) {
 			throw new SQLException();
 		}
 		else {
-	        String sql = "UPDATE " + tableName + " SET ";
+	        String sql = "UPDATE \"" + tableName + "\" SET ";
 	        for (int i = 0; i < columns.length; i++) {
 	        	sql += (columns[i] + " = ");
-	        	sql += ("\"" + values[i] + "\" ");
+	        	sql += ("\'" + values[i] + "\' ");
 	        }
-	        sql += "WHERE id = " + id;
+	        sql += "WHERE \"Id\" = " + id;
 	        System.out.println(sql);
 	        conn.prepareStatement(sql).execute();
 		}
 	}
-	// TODO: This needs to be stored persistently!
-	/*public void registerParsed(String tableName) {
-		parseList.add(tableName.toLowerCase());
-	}
-	*/
-	/*public boolean beenParsed(String tableName) {
-		for (String name : parseList) {
-			if (name.contentEquals(tableName.toLowerCase())) {
-				return true;
-			}
-		}
-		return false;
-	}*/
 }

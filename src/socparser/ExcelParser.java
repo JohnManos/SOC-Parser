@@ -35,7 +35,7 @@ public class ExcelParser {
 		    int rowIndex = 0;
 		    for (Row row : sheet) {
 		    	if (!isRowEmpty(row)) { // Skip empty rows
-		    		Class rowObject = new Class();
+		    		RowObject rowObject = new RowObject();
 			    	String[] rowItem = new String[row.getLastCellNum()];
 			    	int cellIndex = 0;
 			        for (Cell cell : row) {

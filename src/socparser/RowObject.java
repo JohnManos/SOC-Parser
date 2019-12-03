@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-public class Class {
+public class RowObject {
 	/*public String course = "";
 	public String gordonRule = "";
 	public String genEd = "";
