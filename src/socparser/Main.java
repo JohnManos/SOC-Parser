@@ -5,6 +5,7 @@ import java.io.File;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FilenameUtils;
 import javafx.application.Application;
@@ -178,7 +179,16 @@ public class Main extends Application {
 	
 	private void populateTable(){
 		ResultSet rs;
-        if (!displayed) {      	
+        if (!displayed) {
+        	
+        	// Gather list of hidden columns so they can be set to hidden again after repopulating table (at end of this function)
+        	ArrayList<TableColumn> hiddenColumns = new ArrayList<TableColumn>();
+        	for (int i = 0; i < table.getColumns().toArray().length; i++) {
+        		if (table.getColumns().get(i).visibleProperty().getValue() == false) {
+        			hiddenColumns.add(table.getColumns().get(i));
+        		}
+        	}
+        	
         	// Construct the SQL query used to reorganize the soc data
     		data.removeAll(data);
     		table.getColumns().clear();
@@ -246,6 +256,7 @@ public class Main extends Application {
         	try {
 	        	ResultSetMetaData rsmd = rs.getMetaData();
 		    	for(int i = 1; i <= rsmd.getColumnCount(); i++){
+		    		
 		    		final int j = i - 1; // The factory below requires a final (or effectively final) variable to be used
 		    		TableColumn<ObservableList<String>, String> col = new TableColumn<ObservableList<String>, String>();
 		    		// Create the Event Handler for each column's header button (used to hide columns)
@@ -254,13 +265,15 @@ public class Main extends Application {
 		    				col.setVisible(false);
 		    			}
 		    		};
+		    		
 		    		// Create the button, set its text to the column label, attach the handler, then set its width so that the label text is never truncated
 		    		Button hide = new Button(rsmd.getColumnLabel(i));
 		    		hide.setOnAction(hideEvent);
 		    		col.setGraphic(hide);
 			        hide.setMinWidth(Button.USE_PREF_SIZE);
+			        
 			        // Create event handler for committing edit of Comment cell
-			        EventHandler<CellEditEvent<ObservableList<String>, String>> commit = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
+			        EventHandler<CellEditEvent<ObservableList<String>, String>> commitComment = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
 			        	public void handle(CellEditEvent<ObservableList<String>, String> e) {
 			        		ObservableList<String> row = e.getRowValue();
 			        		String idString = row.get(0);
@@ -281,12 +294,38 @@ public class Main extends Application {
 			        // Make Comment cells editable with textfield, and attach commit handler
 			        if (((Button)col.getGraphic()).getText().equals("Comments")) {
 			        	col.setCellFactory(TextFieldTableCell.forTableColumn());
-			        	col.addEventHandler(TableColumn.editCommitEvent(), commit);
+			        	col.addEventHandler(TableColumn.editCommitEvent(), commitComment);
 			        }
+			        // Create event handler for committing edit of Instructor cell
+			        EventHandler<CellEditEvent<ObservableList<String>, String>> commitInstructor = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
+			        	public void handle(CellEditEvent<ObservableList<String>, String> e) {
+			        		ObservableList<String> row = e.getRowValue();
+			        		String idString = row.get(0);
+			        		String[] ids = idString.split(" ");
+			        		String[] instructor = {e.getNewValue()};
+			        		String[] column = {"Instructor"};
+			        		for (String id : ids) {
+				        		try {
+				        			renderer.update(fileName, id, column, instructor);
+				        		} catch(SQLException se) {
+				        			se.printStackTrace();
+				        		}		
+			        		}
+			        		displayed = false;
+			        		populateTable();
+			        	}
+			        };
+			        // Make Instructor cells editable with textfield, and attach commit handler
+			        if (((Button)col.getGraphic()).getText().equals("Instructor")) {
+			        	col.setCellFactory(TextFieldTableCell.forTableColumn());
+			        	col.addEventHandler(TableColumn.editCommitEvent(), commitInstructor);
+			        }
+			        
 			        // Make our implementation-specific Id column always hidden
 			        if (((Button)col.getGraphic()).getText().equals("Id")) {
 			        	col.setVisible(false);
 			        }
+			        
 		    		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
 		    		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
 		    		// Basically this stuff is stupid complicated so just follow the documentation and/or stackoverflow.
@@ -319,7 +358,7 @@ public class Main extends Application {
 				se.printStackTrace();
 	        	System.err.println("Error populating table.");  
 	        	System.err.println("Error retrieving from table " + fileName);  
-			}
+			}        	
         	
         	bindSearchField();
 	    	displayed = true;
@@ -327,6 +366,15 @@ public class Main extends Application {
 		    	root.getChildren().add(dropButton);
 	    	}
 	    	autoResizeColumns();
+	    	
+        	// Ensure previously hidden columns remain hidden when table is repopulated (within same session ONLY)
+        	for (int i = 0; i < table.getColumns().toArray().length; i++) {
+        		for (TableColumn col : hiddenColumns) {
+        		if (((Button) col.getGraphic()).getText().equals(((Button) table.getColumns().get(i).getGraphic()).getText())) { // I hate java
+        			table.getColumns().get(i).setVisible(false);
+        		}
+        		}
+        	}
         }
 	}
 	
