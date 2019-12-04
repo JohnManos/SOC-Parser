@@ -18,8 +18,8 @@ public class DBRenderer {
 	private Connection conn = null;
 	private ArrayList<String> parseList = new ArrayList<String>(); // used ArrayList for its auto resizing
 	
-	DBRenderer(String dbUrl) {
-		connectToServer(dbUrl);	
+	DBRenderer(String dbUrl, String driver) {
+		connectToServer(dbUrl, driver);	
 		//createDatabase(dbName);
 		//connectToServer(dbUrl + dbName);
 	}
@@ -28,10 +28,10 @@ public class DBRenderer {
 		return this.conn;
 	}
 	
-	public void connectToServer(String url) {
+	public void connectToServer(String url, String driver) {
 		System.out.println("Connecting to server...");
 		try {
-			//Class.forName(driver);
+			Class.forName(driver);
 		    conn = DriverManager.getConnection(url);
 		}catch (Exception e) {
 			e.printStackTrace();
@@ -213,7 +213,7 @@ public class DBRenderer {
 		else {
 	        String sql = "UPDATE \"" + tableName + "\" SET ";
 	        for (int i = 0; i < columns.length; i++) {
-	        	sql += (columns[i] + " = ");
+	        	sql += ("\"" + columns[i] + "\" = ");
 	        	sql += ("\'" + values[i] + "\' ");
 	        }
 	        sql += "WHERE \"Id\" = " + id;

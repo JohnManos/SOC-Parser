@@ -61,13 +61,14 @@ public class Main extends Application {
 	private String fileName = null;
 	private String filePath = null;
 	///private final String dbUrl = "jdbc:mysql://localhost:3306/";
-	private final String dbUrl = "jdbc:h2:~/socparser;create=true;user=me;password=mine";
+	private final String dbUrl = "jdbc:h2:./socparser;create=true;user=me;password=mine";
 	//private final String dbUrl = "jdbc:derby:socparser;create=true;user=me;password=mine";
 	//private final String driver = "org.apache.derby.jdbc.EmbeddedDriver";
 	private ExcelParser parser = null;
 	private DBRenderer renderer = null;
 	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
     private TableView<ObservableList<String>> table = new TableView<ObservableList<String>>();
+    private TextField searchField = new TextField();
     private boolean displayed = false;
     private boolean viaParseButton = false; /// TODO: the need for this bool is likely indicative of design flaw
 
@@ -85,7 +86,7 @@ public class Main extends Application {
 		GridPane root = new GridPane();
 		
 		parser = new ExcelParser();
-		renderer = new DBRenderer(dbUrl);
+		renderer = new DBRenderer(dbUrl, "org.h2.Driver");
 		ObservableList<String> tableNames = FXCollections.observableArrayList(renderer.getTableNames());
 		
 		ComboBox choiceBox = new ComboBox();
@@ -128,39 +129,15 @@ public class Main extends Application {
 			public void handle(ActionEvent e) {
 				int i = 0;
 				for (Object col : table.getColumns()) {
-					if (i++ == 0) continue;
+					if (i++ == 0) continue; // Never set the Id column to visible, because it is an internal implementation detail
 					((TableColumn) col).setVisible(true);
 				}
 			}
 		};
 		resetButton.setOnAction(resetEvent);
-		
-		TextField searchField = new TextField("Search table...");
-		final List<TableColumn<ObservableList<String>, ?>> columns = table.getColumns();
-	    FilteredList<ObservableList<String>> filteredData = new FilteredList<>(data);
-	    filteredData.predicateProperty().bind(Bindings.createObjectBinding(() -> {
-	        String text = searchField.getText();
-	        if (text == null || text.isEmpty()) {
-	            return null;
-	        }
-	        final String filterText = text.toLowerCase();
-	        return o -> {
-	            for (TableColumn<ObservableList<String>, ?> col : columns) {
-	                ObservableValue<?> observable = col.getCellObservableValue(o);
-	                if (observable != null) {
-	                    Object value = observable.getValue();
-	                    if (value != null && value.toString().toLowerCase().equals(filterText)) {
-	                        return true;
-	                    }
-	                }
-	            }
-	            return false;
-	        };
-	    }, searchField.textProperty()));
-	    SortedList<ObservableList<String>> sortedData = new SortedList<>(filteredData);
-	    sortedData.comparatorProperty().bind(table.comparatorProperty());
-	    table.setItems(sortedData);
-	    
+			   
+		searchField.setPromptText("Search table...");
+
 	    RadioButton compoundView = new RadioButton("Compound View");
 	    RadioButton meetingView = new RadioButton("Meeting View");
 		
@@ -204,10 +181,10 @@ public class Main extends Application {
         	for(int i = 0 ; i < labels.length; i++){
         		String label = labels[i];
 				//sql += ("uPDATE " + fileName + " t1, " + fileName + " t2 SET label = CONCAT_WS(t1.\"" + label + "\", t2.\"" + label + "\") WHERE t1.Sect <> t2.\"" + label + "\"");
-        		if (label.equals("Id")) {
+        		/*if (label.equals("Id")) {
         			continue;
-        		}
-        		else if (label.equals("Class Nbr") || label.equals("Sect")) {
+        		}*/
+        		if (label.equals("Class Nbr") || label.equals("Sect")) {
         			sql += (" \"" + label + "\",");
         		}
         		else if (label.equals("Day/s")) {
@@ -241,22 +218,25 @@ public class Main extends Application {
 		    	for(int i = 1; i <= rsmd.getColumnCount(); i++){
 		    		final int j = i - 1; // The factory below requires a final (or effectively final) variable to be used
 		    		TableColumn<ObservableList<String>, String> col = new TableColumn<ObservableList<String>, String>();
+		    		// Create the Event Handler for each column's header button (used to hide columns)
 		    		EventHandler<ActionEvent> hideEvent = new EventHandler<ActionEvent>() {
 		    			public void handle(ActionEvent e) {
 		    				col.setVisible(false);
 		    			}
 		    		};
+		    		// Create the button, set its text to the column label, attach the handler, then set its width so that the label text is never truncated
 		    		Button hide = new Button(rsmd.getColumnLabel(i));
 		    		hide.setOnAction(hideEvent);
 		    		col.setGraphic(hide);
 			        hide.setMinWidth(Button.USE_PREF_SIZE);
-			        EventHandler<CellEditEvent<ObservableList<String>, String>> saveThatShitBoi = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
+			        // Create event handler for committing edit of Comment cell
+			        EventHandler<CellEditEvent<ObservableList<String>, String>> commit = new EventHandler<CellEditEvent<ObservableList<String>, String>>() {
 			        	public void handle(CellEditEvent<ObservableList<String>, String> e) {
 			        		ObservableList<String> row = e.getRowValue();
 			        		String idString = row.get(0);
 			        		String[] ids = idString.split(" ");
 			        		String[] comment = {e.getNewValue()};
-			        		String[] column = {"\"Comments\""};
+			        		String[] column = {"Comments"};
 			        		for (String id : ids) {
 				        		try {
 				        			renderer.update(fileName, id, column, comment);
@@ -264,11 +244,18 @@ public class Main extends Application {
 				        			se.printStackTrace();
 				        		}		
 			        		}
+			        		displayed = false;
+			        		populateTable();
 			        	}
 			        };
+			        // Make Comment cells editable with textfield, and attach commit handler
 			        if (((Button)col.getGraphic()).getText().equals("Comments")) {
 			        	col.setCellFactory(TextFieldTableCell.forTableColumn());
-			        	col.addEventHandler(TableColumn.editCommitEvent(), saveThatShitBoi);
+			        	col.addEventHandler(TableColumn.editCommitEvent(), commit);
+			        }
+			        // Make our implementation-specific Id column always hidden
+			        if (((Button)col.getGraphic()).getText().equals("Id")) {
+			        	col.setVisible(false);
 			        }
 		    		// Since we are retrieving data dynamically from a sql table, we cannot use PropertyValueFactory, so we use a Callback.
 		    		// All cell value factories take a CellDataFeatures instance and return an ObservableValue.
@@ -278,10 +265,7 @@ public class Main extends Application {
 		    				return new SimpleStringProperty(param.getValue().get(j).toString());
 		    			}
 		    		});	
-		    		
-		    		
 		    		table.getColumns().addAll(col); 
-		    		//System.out.println("Column [" + i +"] ");
 		    	}
 		
 		    	// Gather data into ObservableList to add to populate table	    	
@@ -307,12 +291,39 @@ public class Main extends Application {
 	        	System.err.println("Error retrieving from table " + fileName);  
 			}
         	
-	    	table.setItems(data);
+        	bindSearchField();
 	    	//table.refresh();
 	    	displayed = true;
 	    	autoResizeColumns();
 	    	//table.requestLayout();
         }
+	}
+	
+	private void bindSearchField() {
+		final List<TableColumn<ObservableList<String>, ?>> columns = table.getColumns();
+	    FilteredList<ObservableList<String>> filteredData = new FilteredList<>(data);
+	    filteredData.predicateProperty().bind(Bindings.createObjectBinding(() -> {
+	        String text = searchField.getText();
+	        if (text == null || text.isEmpty()) {
+	            return null;
+	        }
+	        final String filterText = text.toLowerCase();
+	        return o -> {
+	            for (TableColumn<ObservableList<String>, ?> col : columns) {
+	                ObservableValue<?> observable = col.getCellObservableValue(o);
+	                if (observable != null) {
+	                    Object value = observable.getValue();
+	                    if (value != null && value.toString().toLowerCase().contains(filterText)) {
+	                        return true;
+	                    }
+	                }
+	            }
+	            return false;
+	        };
+	    }, searchField.textProperty()));
+	    SortedList<ObservableList<String>> sortedData = new SortedList<>(filteredData);
+	    sortedData.comparatorProperty().bind(table.comparatorProperty());
+	    table.setItems(sortedData);
 	}
 	
 	private void autoResizeColumns() {
