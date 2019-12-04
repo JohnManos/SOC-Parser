@@ -46,6 +46,7 @@ import javafx.scene.text.Text;
 
 public class Main extends Application {
 	
+	GridPane root = new GridPane();
 	private Desktop desktop = Desktop.getDesktop();
 	private File file = null;
 	private String fileName = null;
@@ -56,6 +57,7 @@ public class Main extends Application {
 	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
     private TableView<ObservableList<String>> table = new TableView<ObservableList<String>>();
     private TextField searchField = new TextField();
+    private final Button dropButton = new Button("Drop this spreadsheet");
     private boolean displayed = false;
     private boolean isCompoundMode = true;
 
@@ -70,7 +72,6 @@ public class Main extends Application {
 	
 	private void createHomeStage(Stage stage) {
 		stage.setTitle("Home");
-		GridPane root = new GridPane();
 		
 		parser = new ExcelParser();
 		renderer = new DBRenderer(dbUrl, "org.h2.Driver");
@@ -117,6 +118,18 @@ public class Main extends Application {
 			}
 		};
 		resetButton.setOnAction(resetEvent);
+		
+		EventHandler<ActionEvent> dropEvent = new EventHandler<ActionEvent>() {
+			public void handle(ActionEvent e) {
+				renderer.dropTable(fileName);
+	    		data.removeAll(data);
+	    		table.getColumns().clear();
+	    		int i = choiceBox.getItems().indexOf(fileName);
+	    		choiceBox.getSelectionModel().clearSelection();
+	    		choiceBox.getItems().remove(i);
+			}		
+		};
+		dropButton.setOnAction(dropEvent);
 			   
 		searchField.setPromptText("Search table...");
 
@@ -141,6 +154,7 @@ public class Main extends Application {
 		choiceBox.setMaxWidth(Double.MAX_VALUE);		
 		GridPane.setConstraints(openButton, 0, 0, 2, 1);
 		GridPane.setConstraints(resetButton, 2, 0, 1, 1);
+		GridPane.setConstraints(dropButton, 0, 1, 2, 1);
 		GridPane.setConstraints(choiceBox, 3, 0, 3, 1);
 		GridPane.setConstraints(compoundView, 2, 1, 1, 1);
 		GridPane.setConstraints(meetingView, 3, 1, 1, 1);
@@ -309,6 +323,9 @@ public class Main extends Application {
         	
         	bindSearchField();
 	    	displayed = true;
+	    	if (!root.getChildren().contains(dropButton)) {
+		    	root.getChildren().add(dropButton);
+	    	}
 	    	autoResizeColumns();
         }
 	}

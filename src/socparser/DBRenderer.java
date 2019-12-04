@@ -215,6 +215,16 @@ public class DBRenderer {
 		}
 	}
 	
+	public void dropTable(String tableName) {
+		try {
+			System.out.println("Dropping table " + tableName + "...");
+			String sql = "DROP TABLE \"" + tableName + "\"";
+	        conn.prepareStatement(sql).execute();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public void disconnect() {
 		if (conn != null) {
 			try {
