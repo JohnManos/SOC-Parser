@@ -43,6 +43,8 @@ import javafx.scene.control.TableColumn.CellDataFeatures;
 import javafx.scene.control.TableColumn.CellEditEvent;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Toggle;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.ColumnConstraints;
 //import javafx.scene.control.TextField;
@@ -71,6 +73,7 @@ public class Main extends Application {
     private TextField searchField = new TextField();
     private boolean displayed = false;
     private boolean viaParseButton = false; /// TODO: the need for this bool is likely indicative of design flaw
+    private boolean isCompoundMode = true;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -138,9 +141,23 @@ public class Main extends Application {
 			   
 		searchField.setPromptText("Search table...");
 
+		final ToggleGroup group = new ToggleGroup();
 	    RadioButton compoundView = new RadioButton("Compound View");
 	    RadioButton meetingView = new RadioButton("Meeting View");
-		
+	    compoundView.setToggleGroup(group);
+	    meetingView.setToggleGroup(group);
+	    compoundView.setSelected(true);
+	    group.selectedToggleProperty().addListener(new ChangeListener<Toggle>(){
+	        public void changed(ObservableValue<? extends Toggle> ov,
+	            Toggle old_toggle, Toggle new_toggle) {
+	                if (group.getSelectedToggle() != null) {
+	                    isCompoundMode = !isCompoundMode;
+	                    displayed = false;
+	                    populateTable();
+	                }                
+	            }
+	    });
+
 		openButton.setMaxWidth(Double.MAX_VALUE);
 		choiceBox.setMaxWidth(Double.MAX_VALUE);		
 		GridPane.setConstraints(openButton, 0, 0, 2, 1);
@@ -162,6 +179,7 @@ public class Main extends Application {
 		Scene scene = new Scene(root, 800, 800);
 		scene.getStylesheets().add(getClass().getResource("socparser.css").toExternalForm());
 		stage.setScene(scene);
+		stage.setOnCloseRequest(e -> renderer.disconnect());
 		stage.show();
 	}
 	
@@ -175,34 +193,58 @@ public class Main extends Application {
         	// Construct the SQL query used to reorganize the soc data
     		data.removeAll(data);
     		table.getColumns().clear();
-    		//table.refresh();
         	String[] labels = renderer.getColumnNames(fileName);
 			String sql = "SELECT";
-        	for(int i = 0 ; i < labels.length; i++){
-        		String label = labels[i];
-				//sql += ("uPDATE " + fileName + " t1, " + fileName + " t2 SET label = CONCAT_WS(t1.\"" + label + "\", t2.\"" + label + "\") WHERE t1.Sect <> t2.\"" + label + "\"");
-        		/*if (label.equals("Id")) {
-        			continue;
-        		}*/
-        		if (label.equals("Class Nbr") || label.equals("Sect")) {
-        			sql += (" \"" + label + "\",");
-        		}
-        		else if (label.equals("Day/s")) {
-        			sql += (" GROUP_CONCAT(\"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') \"" + label + "\",");
-        		}
-        		else {
-        			sql += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') \"" + label + "\",");
-        		}
-        		// THIS ONE sql += (" IF(t1.\"" + label + "\" = t2.\"" + label + "\", t1.\"" + label + "\", GROuP_CONCAT(DISTINCT t1.\"" + label + "\" SEPARATOR ' ')),");				
-        		//sql += (" IF(\"" + label + "\" = Sect OR \"" + label + "\" = \"Class Nbr\", \"" + label + "\", GROuP_CONCAT(DISTINCT t1.\"" + label + "\" SEPARATOR ' ')),");				
-				// sql += (" CASE WHEN \"t1." + label + "\" = \"t2." + label + "\" THEN \"t1." + label + "\" WHEN \"t1." + label + "\" <> \"t2." + label + "\" THEN CONCAT_WS(\"t1." + label + "\",\"t2." + label + "\") END,");				
-        	}
-        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
-        	sql += (" FROM \"" + fileName + "\" GROUP BY \"Class Nbr\", \"Sect\"");
-        	//sql += (" FROM \"" + fileName + "\" t1 JOIN \"" + fileName + "\" t2 ON t1.Sect = t2.Sect AND t1.\"Class Nbr\" = t2.\"Class Nbr\" GROUP BY t1.Sect, t1.\"Class Nbr\"");
+        	if (isCompoundMode == true) {	
+	        	for(int i = 0 ; i < labels.length; i++){
+	        		String label = labels[i];
+	        		if (label.equals("Class Nbr") || label.equals("Sect")) {
+	        			sql += (" \"" + label + "\",");
+	        		}
+	        		else if (label.equals("Day/s")) {
+	        			sql += (" GROUP_CONCAT(\"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') \"" + label + "\",");
+	        		}
+	        		else {
+	        			sql += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') \"" + label + "\",");
+	        		}
+	        	}
+	        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+	        	sql += (" FROM \"" + fileName + "\" GROUP BY \"Class Nbr\", \"Sect\"");
+    		}
+    		else {
+    			String sql1 = "SELECT";
+    			for(int i = 0 ; i < labels.length; i++){
+	        		String label = labels[i];
+	        		if (label.equals("Join")) {
+	        			sql1 += (" \"" + label + "\",");
+	        		}
+	        		else if (label.equals("Day/s")) {
+	        			sql1 += (" \"" + label + "\",");
+	        		}
+	        		else if (label.equals("Facility")) {
+	        			sql1 += (" \"" + label + "\",");
+	        		}
+	        		else if (label.equals("Time")) {
+	        			sql1 += (" \"" + label + "\",");
+	        		}
+	        		else {
+	        			sql1 += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\",");
+	        			//sql += (" CASE WHEN \"Join\" <> '' THEN GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\" ELSE \"" + label + "\" end,");
+	        		}
+	        	}
+	        	sql1 = sql1.substring(0, sql1.length() - 1); // chop trailing comma
+	        	sql1 += (" FROM \"" + fileName + "\" WHERE \"Join\" <> '' GROUP BY \"Day/s\", \"Facility\", \"Time\", \"Join\"");
+	        	//sql += (" FROM \"" + fileName + "\" GROUP BY \"Day/s\", \"Join\" HAVING \"Join\" <> ''");
+    			String sql2 = "SELECT * FROM \"" + fileName + "\" WHERE \"Join\" = ''";
+	        	//sql = "SELECT * FROM (" + sql1 + ") t1 OUTTER JOIN (" + sql2 + ") t2 ON t1.Id = t2.Id";
+	        	sql = sql1 + " UNION ALL " + sql2;
+    		}
         	System.out.println(sql);
         	try {
 				rs = renderer.getConnection().createStatement().executeQuery(sql);
+				if (!isCompoundMode) {
+					
+				}
 			} catch (SQLException se) {
 				se.printStackTrace();
 	        	System.err.println("Error populating table.");  

@@ -221,4 +221,15 @@ public class DBRenderer {
 	        conn.prepareStatement(sql).execute();
 		}
 	}
+	
+	public void disconnect() {
+		if (conn != null) {
+			try {
+				System.out.println("Disconnecting from server...");
+				conn.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
 }
