@@ -2,19 +2,12 @@ package socparser;
 	
 import java.awt.Desktop;
 import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.io.FilenameUtils;
 import javafx.application.Application;
-import javafx.beans.Observable;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.value.ChangeListener;
@@ -25,7 +18,6 @@ import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
-import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -47,13 +39,9 @@ import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.ColumnConstraints;
-//import javafx.scene.control.TextField;
-//import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.text.Text;
-//import javafx.scene.layout.StackPane;
 
 
 public class Main extends Application {
@@ -62,17 +50,13 @@ public class Main extends Application {
 	private File file = null;
 	private String fileName = null;
 	private String filePath = null;
-	///private final String dbUrl = "jdbc:mysql://localhost:3306/";
 	private final String dbUrl = "jdbc:h2:./socparser;create=true;user=me;password=mine";
-	//private final String dbUrl = "jdbc:derby:socparser;create=true;user=me;password=mine";
-	//private final String driver = "org.apache.derby.jdbc.EmbeddedDriver";
 	private ExcelParser parser = null;
 	private DBRenderer renderer = null;
 	private ObservableList<ObservableList<String>> data = FXCollections.observableArrayList();
     private TableView<ObservableList<String>> table = new TableView<ObservableList<String>>();
     private TextField searchField = new TextField();
     private boolean displayed = false;
-    private boolean viaParseButton = false; /// TODO: the need for this bool is likely indicative of design flaw
     private boolean isCompoundMode = true;
 
 	@Override
@@ -98,11 +82,8 @@ public class Main extends Application {
         choiceBox.getSelectionModel().selectedIndexProperty().addListener(new ChangeListener<Number>() {
         	public void changed(ObservableValue ov, Number value, Number newValue) { 
             	fileName = tableNames.get(newValue.intValue());
-            	//if (!viaParseButton) { // this is necessary so that setting a defalt choicebox does not trigger table poplation
-            		displayed = false;
-            		populateTable();
-            	//}
-            	//viaParseButton = false;
+            	displayed = false;
+            	populateTable();
             }  
         });
         
@@ -116,9 +97,7 @@ public class Main extends Application {
                     filePath = file.getPath();
             		if (!renderer.tableExists(fileName)) {
 	                    parseAndRender();
-	        			//populateTable();
 	                	tableNames.add(fileName);
-	                	//viaParseButton = true;
 	                	choiceBox.getSelectionModel().select(fileName);
             		}
             		else System.out.println("File already in database.");
@@ -186,10 +165,6 @@ public class Main extends Application {
 	private void populateTable(){
 		ResultSet rs;
         if (!displayed) {      	
-        	//table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        	//table.requestLayout();
-        	// TODO: refactor the following into a DBRenderer method that takes the filename and 'keys' as params (in this case, Sect and Class Nbr)
-        	// TODO: fix critical bug in which rows do not concatenate properly after refactoring to H2 db
         	// Construct the SQL query used to reorganize the soc data
     		data.removeAll(data);
     		table.getColumns().clear();
@@ -230,16 +205,13 @@ public class Main extends Application {
 	        		}	        		
 	        		else {
 	        			sql += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\",");
-	        			//sql += (" CASE WHEN \"Join\" <> '' THEN GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\" ELSE \"" + label + "\" end,");
 	        		}
 	        	}
 	        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
 	        	sql += (" FROM \"" + fileName + "\" WHERE \"Join\" <> '' AND  \"Facility\" <> '' GROUP BY \"Day/s\", \"Facility\", \"Time\", \"Join\"");
-	        	//sql += (" FROM \"" + fileName + "\" GROUP BY \"Day/s\", \"Join\" HAVING \"Join\" <> ''");
     			sql += (" UNION ALL SELECT * FROM \"" + fileName + "\" WHERE \"Join\" = ''");
     			sql += (" UNION SELECT * FROM \"" + fileName + "\" WHERE \"Facility\" = ''");
     			sql += (") GROUP BY \"Class Nbr\", \"Sect\"");
-	        	//sql = "SELECT * FROM (" + sql1 + ") t1 OUTTER JOIN (" + sql2 + ") t2 ON t1.Id = t2.Id";
     		}
         	System.out.println(sql);
         	try {
@@ -336,10 +308,8 @@ public class Main extends Application {
 			}
         	
         	bindSearchField();
-	    	//table.refresh();
 	    	displayed = true;
 	    	autoResizeColumns();
-	    	//table.requestLayout();
         }
 	}
 	
@@ -397,7 +367,7 @@ public class Main extends Application {
 	}
 	
 	private void parseAndRender() {
-		String[][] dataArray = parser.parseFile(filePath, renderer);
+		String[][] dataArray = parser.parseFile(filePath);
 		String[] labels = new String[dataArray[0].length + 2]; // plus two because we are adding an id column and a comments column
 		int rowIndex = 0; // keeps track of the row number, so that row 0 is only used for column names, and to populate Id column
 		for (String[] row : dataArray) {

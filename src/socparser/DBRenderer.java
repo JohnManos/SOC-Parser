@@ -1,6 +1,5 @@
 package socparser;
 
-import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -14,14 +13,10 @@ import java.util.Set;
 
 public class DBRenderer {
 	
-	//private final String url = "jdbc:mysql://localhost:3306/";
 	private Connection conn = null;
-	private ArrayList<String> parseList = new ArrayList<String>(); // used ArrayList for its auto resizing
 	
 	DBRenderer(String dbUrl, String driver) {
 		connectToServer(dbUrl, driver);	
-		//createDatabase(dbName);
-		//connectToServer(dbUrl + dbName);
 	}
 	
 	public Connection getConnection() {
@@ -40,7 +35,6 @@ public class DBRenderer {
 	
 	public void createDatabase(String dbName) {
 		Statement stmt = null;
-		//connectToServer(url);
 		try {  
 			if (!databaseExists(dbName)) {
 				System.out.println("Creating database...");
@@ -138,7 +132,6 @@ public class DBRenderer {
 		Set<Map.Entry<String, String>> rowData = rowItem.getData();
         PreparedStatement ps = null;
         try {
-	        // String sql = "Insert into SAMPLE(Course,GordonRule,GenEd,Section,ClassNum,MinMaxCred,Days,Time,MeetingPattern,Spec,SOC,CourseTitle,Instructor,EnrollmentCap,ScheduleCodes) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         	String sql = "Insert into \"" + tableName + "\"(";
         	// The keys are our column labels
         	for (Entry<String, String> entry : rowData) {
