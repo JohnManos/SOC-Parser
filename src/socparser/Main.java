@@ -195,7 +195,7 @@ public class Main extends Application {
     		table.getColumns().clear();
         	String[] labels = renderer.getColumnNames(fileName);
 			String sql = "SELECT";
-        	if (isCompoundMode == true) {	
+	
 	        	for(int i = 0 ; i < labels.length; i++){
 	        		String label = labels[i];
 	        		if (label.equals("Class Nbr") || label.equals("Sect")) {
@@ -209,35 +209,37 @@ public class Main extends Application {
 	        		}
 	        	}
 	        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+	        if (isCompoundMode) {
 	        	sql += (" FROM \"" + fileName + "\" GROUP BY \"Class Nbr\", \"Sect\"");
-    		}
-    		else {
-    			String sql1 = "SELECT";
+	        }
+	        else {
+    			sql += " FROM (SELECT";
     			for(int i = 0 ; i < labels.length; i++){
 	        		String label = labels[i];
 	        		if (label.equals("Join")) {
-	        			sql1 += (" \"" + label + "\",");
+	        			sql += (" \"" + label + "\",");
 	        		}
 	        		else if (label.equals("Day/s")) {
-	        			sql1 += (" \"" + label + "\",");
+	        			sql += (" \"" + label + "\",");
 	        		}
 	        		else if (label.equals("Facility")) {
-	        			sql1 += (" \"" + label + "\",");
+	        			sql += (" \"" + label + "\",");
 	        		}
 	        		else if (label.equals("Time")) {
-	        			sql1 += (" \"" + label + "\",");
-	        		}
+	        			sql += (" \"" + label + "\",");
+	        		}	        		
 	        		else {
-	        			sql1 += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\",");
+	        			sql += (" GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\",");
 	        			//sql += (" CASE WHEN \"Join\" <> '' THEN GROUP_CONCAT(DISTINCT \"" + label + "\" ORDER BY \"Id\" SEPARATOR ' ') AS \"" + label + "\" ELSE \"" + label + "\" end,");
 	        		}
 	        	}
-	        	sql1 = sql1.substring(0, sql1.length() - 1); // chop trailing comma
-	        	sql1 += (" FROM \"" + fileName + "\" WHERE \"Join\" <> '' GROUP BY \"Day/s\", \"Facility\", \"Time\", \"Join\"");
+	        	sql = sql.substring(0, sql.length() - 1); // chop trailing comma
+	        	sql += (" FROM \"" + fileName + "\" WHERE \"Join\" <> '' AND  \"Facility\" <> '' GROUP BY \"Day/s\", \"Facility\", \"Time\", \"Join\"");
 	        	//sql += (" FROM \"" + fileName + "\" GROUP BY \"Day/s\", \"Join\" HAVING \"Join\" <> ''");
-    			String sql2 = "SELECT * FROM \"" + fileName + "\" WHERE \"Join\" = ''";
+    			sql += (" UNION ALL SELECT * FROM \"" + fileName + "\" WHERE \"Join\" = ''");
+    			sql += (" UNION SELECT * FROM \"" + fileName + "\" WHERE \"Facility\" = ''");
+    			sql += (") GROUP BY \"Class Nbr\", \"Sect\"");
 	        	//sql = "SELECT * FROM (" + sql1 + ") t1 OUTTER JOIN (" + sql2 + ") t2 ON t1.Id = t2.Id";
-	        	sql = sql1 + " UNION ALL " + sql2;
     		}
         	System.out.println(sql);
         	try {
