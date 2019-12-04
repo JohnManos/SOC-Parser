@@ -1,4 +1,0 @@
-CREATE TABLE SAMPLE("Id" VARCHAR(255), "Course" VARCHAR(255), "Day/s" VARCHAR(255), "Time" VARCHAR(255), "Sect" VARCHAR(255), "Class Nbr" VARCHAR(255));
-INSERT INTO SAMPLE VALUES (1, 'poopie', 'M W F', 'slot1', 1134, 553);
-INSERT INTO SAMPLE VALUES (2, 'poopie', 'T R', 'slot2', 1134, 553);
-INSERT INTO SAMPLE VALUES (3, 'mcscoopie', 'T R', 'slot3', 1111, 444);
